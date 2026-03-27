@@ -63,7 +63,6 @@ def build_browser_context(p, config: dict, device_preset: dict):
         headless=False,
         proxy=config["proxy"],
         **device_preset,
-        user_agent=config["user_agent"],
         timezone_id=config["timezone"],
         locale=config["locale"],
         geolocation=config["geolocation"],
