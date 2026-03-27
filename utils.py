@@ -6,7 +6,7 @@ import string
 import re
 
 # Inisialisasi UserAgent
-ua = UserAgent(browsers=['chrome', 'edge'])
+ua = UserAgent().mobile
 
 def generate_session_id(length=4):
     """Membuat ID sesi acak untuk DataImpulse Sticky Session."""

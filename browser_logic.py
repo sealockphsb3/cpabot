@@ -3,7 +3,7 @@ import re
 import time
 from playwright.sync_api import sync_playwright
 from playwright_stealth import stealth_sync
-
+import random
 from utils import (
     get_random_user_agent,
     get_proxy,
@@ -43,13 +43,26 @@ def parse_proxy(proxy_raw: str):
 
     return {"server": proxy_raw}
 
+def get_random_mobile_device(p):
+    """Mengambil preset perangkat mobile secara acak dari library Playwright."""
+    # Filter hanya perangkat yang memiliki flag is_mobile
+    mobile_devices = [
+        name for name, v in p.devices.items() 
+        if v.get('is_mobile') is True
+    ]
+    
+    random_device_name = random.choice(mobile_devices)
+    print(f"[LOG] Emulasi Perangkat: {random_device_name}")
+    
+    return p.devices[random_device_name]
 
-def build_browser_context(p, config: dict):
+def build_browser_context(p, config: dict, device_preset: dict):
     """Create persistent browser context."""
     return p.chromium.launch_persistent_context(
         config["user_data_dir"],
         headless=False,
         proxy=config["proxy"],
+        **device_preset,
         user_agent=config["user_agent"],
         timezone_id=config["timezone"],
         locale=config["locale"],
@@ -64,8 +77,7 @@ def build_browser_context(p, config: dict):
             "--disable-setuid-sandbox",
             "--enforce-webrtc-ip-permission-check",
             "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"
-        ],
-        viewport=None
+        ]
     )
 
 
@@ -125,7 +137,8 @@ def run_fingerprintcheck(use_proxy: bool = False, session_id: str = "default"):
             }
         }
 
-        context = build_browser_context(p, config)
+        selected_device = get_random_mobile_device(p)
+        context = build_browser_context(p, config, selected_device)
         apply_anti_detection(context)
 
         context.clear_cookies()
@@ -160,6 +173,20 @@ def run_fingerprintcheck(use_proxy: bool = False, session_id: str = "default"):
             
         return score
 
+def fill_random_phone_number(page):
+    # 1. Generate nomor acak (contoh: 08 + 10 digit)
+    random_digits = "".join([str(random.randint(0, 9)) for _ in range(10)])
+    phone_number = f"08{random_digits}"
+
+    # 2. Selector untuk input type tel
+    selector = 'input[type="tel"]'
+
+    # 3. Tunggu elemen muncul dan isi (Playwright Sync akan menunggu otomatis)
+    page.wait_for_selector(selector, state="visible")
+    page.fill(selector, phone_number)
+    
+    print(f"Nomor berhasil diinput: {phone_number}")
+
 def run_visit(url: str, use_proxy: bool = False, session_id: str = "default"):
     user_data_dir = os.path.join(os.getcwd(), "browser_profile")
 
@@ -186,7 +213,8 @@ def run_visit(url: str, use_proxy: bool = False, session_id: str = "default"):
             }
         }
 
-        context = build_browser_context(p, config)
+        selected_device = get_random_mobile_device(p)
+        context = build_browser_context(p, config, selected_device)
         apply_anti_detection(context)
 
         context.clear_cookies()
@@ -196,7 +224,8 @@ def run_visit(url: str, use_proxy: bool = False, session_id: str = "default"):
 
         try:
             page.goto(url, timeout=60000)
-
+            is_mobile = page.evaluate("navigator.userAgentData ? navigator.userAgentData.mobile : 'unknown'")
+            print(f"[LOG] Is Mobile Context: {is_mobile}")
             browser_tz = page.evaluate("Intl.DateTimeFormat().resolvedOptions().timeZone")
             browser_lang = page.evaluate("navigator.language")
 
@@ -206,7 +235,9 @@ def run_visit(url: str, use_proxy: bool = False, session_id: str = "default"):
             page.locator("#Image1").click(position={"x": 20, "y": 15})
             time.sleep(3)
             page.wait_for_load_state("domcontentloaded")
-            time.sleep(30)
+            time.sleep(3)
+            
+            fill_random_phone_number(page)
         except Exception as e:
             print(f"[!] Error saat kunjungan: {e}")
 
